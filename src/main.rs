@@ -2,7 +2,7 @@ mod cli;
 pub mod config;
 mod error;
 mod logging;
-mod network;
+pub mod network;
 
 use anyhow::{Context, Result};
 use clap::Parser;
