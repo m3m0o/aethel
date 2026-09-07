@@ -1,0 +1,22 @@
+[Unit]
+Description=Aethel IPv6 AnyIP HTTP automation
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=aethel
+Group=aethel
+ExecStart=/usr/local/bin/aethel run --config /etc/aethel/run.toml --network /etc/aethel/network.toml
+ExecStopPost=/usr/local/bin/aethel network recover --config /etc/aethel/network.toml
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=true
+KillSignal=SIGTERM
+Restart=on-failure
+TimeoutStopSec=30s
+RuntimeDirectory=aethel
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target

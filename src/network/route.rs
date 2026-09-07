@@ -81,6 +81,9 @@ pub fn cleanup(config: &NetworkConfig) -> Result<String> {
     }
 }
 
+pub fn recover(config: &NetworkConfig) -> Result<String> {
+    cleanup(config).context("failed to recover network state")
+}
 fn parse_prefix(value: &str) -> Result<(Ipv6Addr, u8)> {
     let (address, length) = value
         .split_once('/')

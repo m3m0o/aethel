@@ -15,7 +15,7 @@ use clap::Parser;
 use cli::{Cli, Command, NetworkArguments, NetworkCommand};
 use config::{NetworkConfig, load_network, load_run, parse_ndp_backend, validate_network_config};
 use error::AppError;
-use network::{cleanup, configured_summary, discover, host_summary, setup};
+use network::{cleanup, configured_summary, discover, host_summary, recover, setup};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -78,6 +78,12 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                 let network = resolve_network(arguments)?;
                 cleanup(&network)
                     .context("failed to clean up network")
+                    .map_err(AppError::from)
+            }
+            NetworkCommand::Recover(arguments) => {
+                let network = resolve_network(arguments)?;
+                recover(&network)
+                    .context("failed to recover network state")
                     .map_err(AppError::from)
             }
             NetworkCommand::Check(arguments) => {
