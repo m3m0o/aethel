@@ -70,7 +70,7 @@ fn inspect_host(config: Option<&NetworkConfig>) -> Result<NetworkSnapshot> {
 }
 
 #[cfg(target_os = "linux")]
-fn interface_index(interface: &str) -> Result<u32> {
+pub(crate) fn interface_index(interface: &str) -> Result<u32> {
     if interface.is_empty() || interface.contains('/') || interface.contains('\\') {
         anyhow::bail!("invalid network interface name: {interface}");
     }
@@ -105,7 +105,7 @@ fn read_sysctl(path: &str) -> Result<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn read_routes() -> Result<Vec<RouteState>> {
+pub(crate) fn read_routes() -> Result<Vec<RouteState>> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_io()
         .build()
