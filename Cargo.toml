@@ -12,7 +12,7 @@ clap = { version = "4.5", features = ["derive"] }
 futures-util = "0.3"
 netlink-packet-route = "0.25"
 rtnetlink = "0.18"
-reqwest = { version = "0.12", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["brotli", "cookies", "deflate", "gzip", "http2", "rustls-tls"] }
 socket2 = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
