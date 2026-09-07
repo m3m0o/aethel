@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::net::Ipv6Addr;
 
 use anyhow::{Context, Result};
 use futures_util::TryStreamExt;
-use netlink_packet_route::route::{RouteAttribute, RouteMessage, RouteType};
+use netlink_packet_route::route::{RouteAddress, RouteAttribute, RouteMessage, RouteType};
 use rtnetlink::RouteMessageBuilder;
 
 use crate::config::{NdpBackend, NetworkConfig};
@@ -115,7 +115,9 @@ fn read_routes() -> Result<Vec<RouteState>> {
             rtnetlink::new_connection().context("failed to open route Netlink connection")?;
         tokio::spawn(connection);
 
-        let request = handle.route().get(RouteMessageBuilder::new().build());
+        let request = handle
+            .route()
+            .get(RouteMessageBuilder::<Ipv6Addr>::new().build());
         let messages = request
             .execute()
             .try_collect::<Vec<RouteMessage>>()
@@ -127,13 +129,16 @@ fn read_routes() -> Result<Vec<RouteState>> {
 
 #[cfg(target_os = "linux")]
 fn route_state(message: RouteMessage) -> Result<RouteState> {
+    let prefix_length = message.header.destination_prefix_length;
     let mut destination = None;
     let mut output_interface = None;
     let mut table = u32::from(message.header.table);
 
     for attribute in message.attributes {
         match attribute {
-            RouteAttribute::Destination(address) => destination = Some(address.to_string()),
+            RouteAttribute::Destination(address) => {
+                destination = Some(format_route_address(address, prefix_length));
+            }
             RouteAttribute::Oif(index) => output_interface = Some(index.to_string()),
             RouteAttribute::Table(value) => table = value,
             _ => {}
@@ -146,6 +151,15 @@ fn route_state(message: RouteMessage) -> Result<RouteState> {
         table,
         output_interface,
     })
+}
+
+#[cfg(target_os = "linux")]
+fn format_route_address(address: RouteAddress, prefix_length: u8) -> String {
+    match address {
+        RouteAddress::Inet6(address) => format!("{address}/{prefix_length}"),
+        RouteAddress::Inet(address) => format!("{address}/{prefix_length}"),
+        other => format!("{other:?}/{prefix_length}"),
+    }
 }
 
 #[cfg(target_os = "linux")]
