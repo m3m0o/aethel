@@ -13,7 +13,7 @@ pub fn discover() -> Result<NetworkConfig> {
         let interface = default_route_interface()?;
         let address = global_address(&interface)?;
         let prefix = Ipv6Addr::from(u128::from(address) & (!0u128 << 64));
-        return Ok(NetworkConfig {
+        Ok(NetworkConfig {
             version: 1,
             network: NetworkSection {
                 interface,
@@ -24,7 +24,7 @@ pub fn discover() -> Result<NetworkConfig> {
             route: RouteSection::default(),
             sysctl: SysctlSection::default(),
             state: StateSection::default(),
-        });
+        })
     }
 
     #[cfg(not(target_os = "linux"))]
