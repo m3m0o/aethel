@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use crate::config::{CookieScope, HttpSection, HttpVersion, RedirectPolicy};
 use crate::request::PreparedRequest;
-use crate::rules::{evaluate, BodyStore, Decision, Response as RuleResponse, Rule};
+use crate::rules::{BodyStore, Decision, Response as RuleResponse, Rule, evaluate};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClientGeneration(pub u64);
@@ -106,7 +106,11 @@ impl SourceBoundClient {
                 .context("response body exceeded configured limit")?;
             body.extend_from_slice(&chunk);
         }
-        let rule_response = RuleResponse { status, headers: &headers, body: &body };
+        let rule_response = RuleResponse {
+            status,
+            headers: &headers,
+            body: &body,
+        };
         let decision = evaluate(rules, &rule_response)
             .map_err(|error| anyhow::anyhow!("invalid response rule: {error}"))?;
         let saved_body = body_store
