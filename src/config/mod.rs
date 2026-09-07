@@ -1,15 +1,16 @@
 use std::collections::BTreeMap;
-use std::fmt::{Display, Formatter};
 use std::fs;
 use std::net::Ipv6Addr;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use thiserror::Error;
 
 const CONFIG_VERSION: u32 = 1;
 const MAX_WORKERS: u16 = 1024;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("{0}")]
 pub struct ConfigError(String);
 
 impl ConfigError {
@@ -17,14 +18,6 @@ impl ConfigError {
         Self(message.into())
     }
 }
-
-impl Display for ConfigError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for ConfigError {}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
