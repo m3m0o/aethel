@@ -17,6 +17,12 @@ const ROUTE_MARKER: &str = "anyip-route.state";
 
 pub fn setup(config: &NetworkConfig) -> Result<String> {
     let (prefix, prefix_length) = parse_prefix(&config.network.prefix)?;
+    let capabilities = super::capabilities::inspect()?;
+    if !capabilities.net_admin {
+        anyhow::bail!(
+            "CAP_NET_ADMIN is required to create the AnyIP route; run as root or grant the capability to the aethel binary"
+        );
+    }
     let loopback_index = interface_index(&config.network.loopback)?;
     let routes = read_routes()?;
     match find_route(&routes, prefix, prefix_length, loopback_index) {
