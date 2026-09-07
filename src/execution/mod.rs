@@ -5,6 +5,7 @@ pub use queue::WorkQueue;
 pub use rotation::RotationState;
 
 use crate::config::AddressMode;
+use crate::rules::Decision;
 use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::fs::File;
@@ -163,6 +164,19 @@ impl WorkerCoordinator {
         }
         self.allocator.next(worker)
     }
+
+    pub fn record_result(
+        &self,
+        worker: usize,
+        decision: Option<&Decision>,
+        transport_error: bool,
+    ) -> Result<bool> {
+        if !transport_error && !decision.is_some_and(|result| result.rotate) {
+            return Ok(false);
+        }
+        self.allocator.rotate(worker)?;
+        Ok(true)
+    }
 }
 fn random_u64() -> Result<u64> {
     let mut bytes = [0u8; 8];
@@ -200,6 +214,31 @@ mod tests {
         let first = allocator.next(0).unwrap();
         allocator.rotate(0).unwrap();
         assert_ne!(first, allocator.next(0).unwrap());
+    }
+
+    #[test]
+    fn coordinator_rotates_on_rule_or_transport_result() {
+        let coordinator = WorkerCoordinator::new(
+            "2001:db8::/64",
+            AddressMode::Worker,
+            1,
+            crate::config::RotationScope::Worker,
+            None,
+            None,
+        )
+        .unwrap();
+        let first = coordinator.next_address(0).unwrap();
+        let decision = Decision {
+            rotate: true,
+            ..Decision::default()
+        };
+        assert!(
+            coordinator
+                .record_result(0, Some(&decision), false)
+                .unwrap()
+        );
+        assert_ne!(first, coordinator.next_address(0).unwrap());
+        assert!(coordinator.record_result(0, None, true).unwrap());
     }
     #[test]
     fn coordinator_rotates_worker_scope_by_count() {
