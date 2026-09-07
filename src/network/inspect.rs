@@ -16,7 +16,7 @@ pub fn host_summary() -> Result<String> {
     #[cfg(target_os = "linux")]
     {
         let snapshot = inspect_host(None)?;
-        Ok(format_snapshot(&snapshot))
+        Ok(format_snapshot(&snapshot, None))
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -29,7 +29,7 @@ pub fn host_summary() -> Result<String> {
 
 pub fn configured_summary(config: &NetworkConfig) -> Result<String> {
     let snapshot = inspect_host(Some(config))?;
-    Ok(format_snapshot(&snapshot))
+    Ok(format_snapshot(&snapshot, Some(&config.network.prefix)))
 }
 
 fn inspect_host(config: Option<&NetworkConfig>) -> Result<NetworkSnapshot> {
@@ -153,21 +153,7 @@ fn route_state(message: RouteMessage) -> Result<RouteState> {
     })
 }
 
-#[cfg(target_os = "linux")]
-fn format_route_address(address: RouteAddress, prefix_length: u8) -> String {
-    match address {
-        RouteAddress::Inet6(address) => format!("{address}/{prefix_length}"),
-        RouteAddress::Inet(address) => format!("{address}/{prefix_length}"),
-        other => format!("{other:?}/{prefix_length}"),
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn route_type_name(route_type: RouteType) -> String {
-    format!("{route_type:?}").to_lowercase()
-}
-
-fn format_snapshot(snapshot: &NetworkSnapshot) -> String {
+fn format_snapshot(snapshot: &NetworkSnapshot, configured_prefix: Option<&str>) -> String {
     let routes = snapshot
         .routes
         .iter()
@@ -181,10 +167,14 @@ fn format_snapshot(snapshot: &NetworkSnapshot) -> String {
             )
         })
         .collect::<Vec<_>>();
+    let prefix = configured_prefix
+        .map(|value| format!(" prefix={value},"))
+        .unwrap_or_default();
     format!(
-        "network state: interface={} (index {}), routes=[{}], sysctls={:?}, capabilities=CAP_NET_ADMIN:{} CAP_NET_RAW:{}, ndp_backend={:?}, restoration_available={}",
+        "network state: interface={} (index {}),{} routes=[{}], sysctls={:?}, capabilities=CAP_NET_ADMIN:{} CAP_NET_RAW:{}, ndp_backend={:?}, restoration_available={}",
         snapshot.interface,
         snapshot.interface_index,
+        prefix,
         routes.join("; "),
         snapshot.sysctls,
         snapshot.capabilities.net_admin,
