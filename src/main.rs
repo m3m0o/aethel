@@ -3,6 +3,7 @@ pub mod config;
 mod error;
 mod logging;
 pub mod network;
+pub mod payload;
 pub mod request;
 
 use anyhow::{Context, Result};
