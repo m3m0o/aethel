@@ -17,6 +17,10 @@ use crate::transport::{ClientGeneration, ClientPool};
 
 use super::{StopPolicy, StopState, WorkerCoordinator};
 
+fn stop_requested(decision: &crate::rules::Decision, policy: StopPolicy) -> bool {
+    !decision.matched.is_empty() && (policy.stop_on_match || decision.stop)
+}
+
 const MAX_RESPONSE_BODY_BYTES: u64 = 10 * 1024 * 1024;
 
 pub async fn execute_run(config: &RunConfig, network: &NetworkConfig) -> Result<String> {
@@ -190,7 +194,7 @@ async fn execute_payload(
         body_file: body_file.map(|path| path.display().to_string()),
         error,
     })?;
-    let should_stop = matched && (policy.stop_on_match || decision.stop);
+    let should_stop = stop_requested(&decision, policy);
     let should_stop = stop_state
         .lock()
         .map_err(|_| anyhow::anyhow!("stop state mutex poisoned"))?
@@ -208,5 +212,21 @@ mod tests {
     #[test]
     fn response_body_limit_is_bounded() {
         assert_eq!(MAX_RESPONSE_BODY_BYTES, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn rule_match_stops_only_when_requested() {
+        let mut decision = crate::rules::Decision::default();
+        decision.matched.insert("success".to_owned());
+        let policy = super::StopPolicy {
+            max_requests: None,
+            max_duration: None,
+            max_errors: None,
+            max_error_ratio: None,
+            stop_on_match: false,
+        };
+        assert!(!super::stop_requested(&decision, policy));
+        decision.stop = true;
+        assert!(super::stop_requested(&decision, policy));
     }
 }
