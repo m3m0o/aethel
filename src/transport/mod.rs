@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use reqwest::header::HeaderMap;
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::config::{CookieScope, HttpSection, HttpVersion, RedirectPolicy};
@@ -11,6 +13,57 @@ use crate::rules::{BodyStore, Decision, Response as RuleResponse, Rule, evaluate
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClientGeneration(pub u64);
+
+pub struct ClientPool {
+    config: HttpSection,
+    default_headers: HeaderMap,
+    clients: Mutex<HashMap<usize, Arc<SourceBoundClient>>>,
+}
+
+impl ClientPool {
+    pub fn new(config: &HttpSection, default_headers: HeaderMap) -> Self {
+        Self {
+            config: config.clone(),
+            default_headers,
+            clients: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn client_for(
+        &self,
+        worker: usize,
+        generation: ClientGeneration,
+        address: IpAddr,
+    ) -> Result<Arc<SourceBoundClient>> {
+        if matches!(self.config.cookies, CookieScope::None) {
+            return Ok(Arc::new(SourceBoundClient::new(
+                generation,
+                address,
+                &self.config,
+                self.default_headers.clone(),
+            )?));
+        }
+        let key = match self.config.cookies {
+            CookieScope::Worker => worker,
+            CookieScope::Session => 0,
+            CookieScope::None => unreachable!(),
+        };
+        let mut clients = self.clients.lock().expect("client pool mutex poisoned");
+        if let Some(client) = clients.get(&key) {
+            if client.generation() == generation && client.local_address() == address {
+                return Ok(Arc::clone(client));
+            }
+        }
+        let client = Arc::new(SourceBoundClient::new(
+            generation,
+            address,
+            &self.config,
+            self.default_headers.clone(),
+        )?);
+        clients.insert(key, Arc::clone(&client));
+        Ok(client)
+    }
+}
 
 pub struct SourceBoundClient {
     generation: ClientGeneration,
@@ -126,7 +179,7 @@ impl SourceBoundClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{ClientGeneration, SourceBoundClient};
+    use super::{ClientGeneration, ClientPool, SourceBoundClient};
     use crate::config::{CookieScope, HttpSection, HttpVersion, RedirectPolicy};
     use reqwest::header::{HeaderMap, HeaderValue};
     use std::net::{IpAddr, Ipv6Addr};
@@ -190,5 +243,15 @@ mod tests {
         .unwrap();
         assert_eq!(client.generation(), ClientGeneration(1));
         assert_eq!(headers["x-aethel"], "test");
+    }
+    #[test]
+    fn client_pool_reuses_scope_and_replaces_generation() {
+        let address = IpAddr::V6(Ipv6Addr::LOCALHOST);
+        let pool = ClientPool::new(&config(), HeaderMap::new());
+        let first = pool.client_for(0, ClientGeneration(1), address).unwrap();
+        let reused = pool.client_for(0, ClientGeneration(1), address).unwrap();
+        assert!(std::sync::Arc::ptr_eq(&first, &reused));
+        let replaced = pool.client_for(0, ClientGeneration(2), address).unwrap();
+        assert!(!std::sync::Arc::ptr_eq(&first, &replaced));
     }
 }
