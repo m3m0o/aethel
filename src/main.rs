@@ -3,6 +3,7 @@ pub mod config;
 mod error;
 mod logging;
 pub mod network;
+pub mod request;
 
 use anyhow::{Context, Result};
 use clap::Parser;
