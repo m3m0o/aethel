@@ -1,10 +1,13 @@
 use anyhow::{Context, Result};
+use futures_util::StreamExt;
 use reqwest::header::HeaderMap;
 use std::net::IpAddr;
+use std::path::Path;
 use std::time::Duration;
 
 use crate::config::{CookieScope, HttpSection, HttpVersion, RedirectPolicy};
 use crate::request::PreparedRequest;
+use crate::rules::{BodyStore, Decision, Response as RuleResponse, Rule, evaluate};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClientGeneration(pub u64);
@@ -80,6 +83,40 @@ impl SourceBoundClient {
             ));
         }
         Ok(response)
+    }
+
+    pub async fn execute_with_rules(
+        &self,
+        request: PreparedRequest,
+        rules: &[Rule],
+        body_directory: impl AsRef<Path>,
+        max_body_bytes: u64,
+    ) -> Result<(Decision, Option<std::path::PathBuf>)> {
+        let response = self.execute(request).await?;
+        let status = response.status().as_u16();
+        let headers = response.headers().clone();
+        let mut body_store = BodyStore::create(body_directory, max_body_bytes)
+            .context("failed to create bounded response body store")?;
+        let mut body = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.context("failed to read HTTP response body")?;
+            body_store
+                .write_chunk(&chunk)
+                .context("response body exceeded configured limit")?;
+            body.extend_from_slice(&chunk);
+        }
+        let rule_response = RuleResponse {
+            status,
+            headers: &headers,
+            body: &body,
+        };
+        let decision = evaluate(rules, &rule_response)
+            .map_err(|error| anyhow::anyhow!("invalid response rule: {error}"))?;
+        let saved_body = body_store
+            .finish(decision.save_body)
+            .context("failed to finalize response body store")?;
+        Ok((decision, saved_body))
     }
 
     pub fn client(&self) -> &reqwest::Client {

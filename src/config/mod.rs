@@ -106,6 +106,8 @@ pub struct RunConfig {
     pub rotation: RotationSection,
     #[serde(default)]
     pub stop: StopSection,
+    #[serde(default)]
+    pub rules: Vec<crate::rules::Rule>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -355,6 +357,14 @@ fn validate_run(config: &RunConfig, path: &Path) -> Result<(), ConfigError> {
             "{} [http.total_timeout_ms]: must be greater than zero",
             path.display()
         )));
+    }
+    for rule in &config.rules {
+        rule.when.validate().map_err(|error| {
+            ConfigError::new(format!(
+                "{} [rules.when]: invalid regular expression: {error}",
+                path.display()
+            ))
+        })?;
     }
     Ok(())
 }
