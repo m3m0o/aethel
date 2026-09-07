@@ -9,7 +9,7 @@ pub struct StopPolicy {
     pub stop_on_match: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct StopState {
     started: Instant,
     requests: u64,
@@ -40,6 +40,12 @@ impl StopState {
                 self.requests > 0 && self.errors as f64 / self.requests as f64 >= limit
             })
             || (policy.stop_on_match && matched)
+    }
+}
+
+impl Default for StopState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
