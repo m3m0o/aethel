@@ -15,6 +15,7 @@ rtnetlink = "0.18"
 socket2 = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
+toml = "0.9"
 tokio = { version = "1.47", features = ["net", "process", "rt"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
