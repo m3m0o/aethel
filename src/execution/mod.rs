@@ -105,6 +105,65 @@ impl AddressAllocator {
         anyhow::bail!("failed to allocate a unique IPv6 IID")
     }
 }
+
+pub struct WorkerCoordinator {
+    allocator: AddressAllocator,
+    states: Arc<Mutex<Vec<RotationState>>>,
+    scope: crate::config::RotationScope,
+}
+
+impl WorkerCoordinator {
+    pub fn new(
+        prefix: &str,
+        mode: AddressMode,
+        workers: u16,
+        scope: crate::config::RotationScope,
+        every_requests: Option<u64>,
+        every_ms: Option<u64>,
+    ) -> Result<Self> {
+        let allocator = AddressAllocator::new(prefix, mode, workers)?;
+        let mut states = Vec::with_capacity(workers as usize);
+        for _ in 0..workers {
+            states.push(
+                RotationState::new(every_requests, every_ms)
+                    .map_err(|error| anyhow::anyhow!(error))?,
+            );
+        }
+        Ok(Self {
+            allocator,
+            states: Arc::new(Mutex::new(states)),
+            scope,
+        })
+    }
+
+    pub fn next_address(&self, worker: usize) -> Result<Ipv6Addr> {
+        let mut states = self.states.lock().expect("rotation state mutex poisoned");
+        if worker >= states.len() {
+            anyhow::bail!("worker index {worker} is outside configured worker count");
+        }
+        let rotate = match self.scope {
+            crate::config::RotationScope::Worker => states[worker].record_request(),
+            crate::config::RotationScope::Global => {
+                let mut rotate = false;
+                for state in &mut *states {
+                    rotate |= state.record_request();
+                }
+                rotate
+            }
+        };
+        if rotate {
+            match self.scope {
+                crate::config::RotationScope::Worker => self.allocator.rotate(worker)?,
+                crate::config::RotationScope::Global => {
+                    for index in 0..states.len() {
+                        self.allocator.rotate(index)?;
+                    }
+                }
+            }
+        }
+        self.allocator.next(worker)
+    }
+}
 fn random_u64() -> Result<u64> {
     let mut bytes = [0u8; 8];
     File::open("/dev/urandom")
@@ -141,5 +200,20 @@ mod tests {
         let first = allocator.next(0).unwrap();
         allocator.rotate(0).unwrap();
         assert_ne!(first, allocator.next(0).unwrap());
+    }
+    #[test]
+    fn coordinator_rotates_worker_scope_by_count() {
+        let coordinator = WorkerCoordinator::new(
+            "2001:db8::/64",
+            AddressMode::Worker,
+            1,
+            crate::config::RotationScope::Worker,
+            Some(1),
+            None,
+        )
+        .unwrap();
+        let first = coordinator.next_address(0).unwrap();
+        let second = coordinator.next_address(0).unwrap();
+        assert_ne!(first, second);
     }
 }
