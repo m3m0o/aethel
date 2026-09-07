@@ -88,10 +88,12 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                 None => discover().context("failed to discover network configuration")?,
             };
             validate_network_config(&network)?;
-            Ok(format!(
-                "run configuration valid: {} worker(s), {} concurrent request(s), network {}",
-                run.execution.workers, run.execution.concurrency, network.network.prefix
-            ))
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .context("failed to create run runtime")?
+                .block_on(execution::execute_run(&run, &network))
+                .map_err(AppError::from)
         }
         Command::Network { command } => match command {
             NetworkCommand::Setup(arguments) => {

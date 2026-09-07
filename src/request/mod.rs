@@ -5,6 +5,7 @@ mod toml_template;
 
 pub use model::PreparedRequest;
 pub use raw::parse as parse_raw;
+pub use substitute::placeholders;
 pub use toml_template::parse as parse_toml;
 
 #[cfg(test)]

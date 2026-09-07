@@ -32,6 +32,28 @@ pub fn substitute(input: &str, values: &BTreeMap<String, String>) -> Result<Stri
     Ok(output)
 }
 
+pub fn placeholders(input: &str) -> Result<std::collections::BTreeSet<String>> {
+    let mut names = std::collections::BTreeSet::new();
+    let mut rest = input;
+    while let Some(start) = rest.find("{{") {
+        let after_start = &rest[start + 2..];
+        let end = after_start
+            .find("}}")
+            .ok_or_else(|| anyhow::anyhow!("unterminated placeholder"))?;
+        let name = &after_start[..end];
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|value| value.is_ascii_alphanumeric() || value == '_')
+        {
+            bail!("invalid placeholder name: {name}");
+        }
+        names.insert(name.to_owned());
+        rest = &after_start[end + 2..];
+    }
+    Ok(names)
+}
+
 #[cfg(test)]
 mod tests {
     use super::substitute;
