@@ -1,8 +1,10 @@
 mod queue;
 mod rotation;
+mod stop;
 
 pub use queue::WorkQueue;
 pub use rotation::RotationState;
+pub use stop::{StopPolicy, StopState};
 
 use crate::config::AddressMode;
 use crate::rules::Decision;

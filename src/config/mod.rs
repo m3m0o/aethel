@@ -275,6 +275,10 @@ pub enum ConnectionPolicy {
 pub struct StopSection {
     pub max_requests: Option<u64>,
     pub max_duration_ms: Option<u64>,
+    pub max_errors: Option<u64>,
+    pub max_error_ratio: Option<f64>,
+    #[serde(default)]
+    pub stop_on_match: bool,
 }
 
 pub fn load_network(path: &Path) -> Result<NetworkConfig, ConfigError> {
@@ -365,6 +369,19 @@ fn validate_run(config: &RunConfig, path: &Path) -> Result<(), ConfigError> {
     if config.rotation.every_requests == Some(0) || config.rotation.every_ms == Some(0) {
         return Err(ConfigError::new(format!(
             "{} [rotation]: intervals must be greater than zero",
+            path.display()
+        )));
+    }
+    if config.stop.max_duration_ms == Some(0)
+        || config.stop.max_requests == Some(0)
+        || config.stop.max_errors == Some(0)
+        || config
+            .stop
+            .max_error_ratio
+            .is_some_and(|ratio| !(0.0..=1.0).contains(&ratio))
+    {
+        return Err(ConfigError::new(format!(
+            "{} [stop]: limits must be positive and error ratio must be between 0 and 1",
             path.display()
         )));
     }

@@ -4,6 +4,7 @@ mod error;
 pub mod execution;
 mod logging;
 pub mod network;
+pub mod output;
 pub mod payload;
 pub mod request;
 pub mod rules;
