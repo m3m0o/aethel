@@ -69,16 +69,20 @@ impl Condition {
         match self {
             Self::All { all } => {
                 for c in all {
-                    c.validate()?
+                    c.validate()?;
                 }
             }
             Self::Any { any } => {
                 for c in any {
-                    c.validate()?
+                    c.validate()?;
                 }
             }
-            Self::Not { not } => not.validate()?,
-            Self::BodyRegex { body_regex } => Regex::new(body_regex)?,
+            Self::Not { not } => {
+                not.validate()?;
+            }
+            Self::BodyRegex { body_regex } => {
+                Regex::new(body_regex)?;
+            }
             _ => {}
         }
         Ok(())
