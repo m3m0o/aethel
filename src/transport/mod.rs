@@ -36,7 +36,7 @@ impl SourceBoundClient {
 
         builder = match config.version {
             HttpVersion::Auto => builder,
-            HttpVersion::Http2 => builder.http2_only(),
+            HttpVersion::Http2 => builder.http2_prior_knowledge(),
             HttpVersion::Http1 => builder.http1_only(),
         };
 
