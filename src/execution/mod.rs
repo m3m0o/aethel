@@ -1,4 +1,8 @@
+mod queue;
 mod rotation;
+
+pub use queue::WorkQueue;
+pub use rotation::RotationState;
 
 use crate::config::AddressMode;
 use anyhow::{Context, Result};
