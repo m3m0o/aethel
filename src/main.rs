@@ -67,7 +67,10 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                     anyhow::anyhow!("invalid --wordlist '{mapping}'; expected NAME:PATH")
                 })?;
                 if name.is_empty() || path.is_empty() {
-                    anyhow::bail!("invalid --wordlist '{mapping}'; expected NAME:PATH");
+                    return Err(anyhow::anyhow!(
+                        "invalid --wordlist '{mapping}'; expected NAME:PATH"
+                    )
+                    .into());
                 }
                 run.wordlists.insert(name.to_owned(), path.to_owned());
             }
@@ -188,7 +191,9 @@ fn apply_stop_flags(stop: &mut StopSection, flags: &[String]) -> Result<(), AppE
                     anyhow::anyhow!("invalid --stop '{flag}'; on-match expects true or false")
                 })?
             }
-            _ => anyhow::bail!("unknown stop condition '{name}'"),
+            _ => {
+                return Err(anyhow::anyhow!("unknown stop condition '{name}'").into());
+            }
         }
     }
     Ok(())
