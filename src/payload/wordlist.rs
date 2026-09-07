@@ -61,15 +61,15 @@ impl Clusterbomb {
         }
         if !self.started {
             self.started = true;
-            self.current = self
-                .readers
-                .iter_mut()
-                .map(WordlistReader::next_value)
-                .collect::<io::Result<Option<Vec<_>>>>()?;
-            if self.current.is_none() {
-                self.finished = true;
-                return Ok(None);
+            let mut current = Vec::with_capacity(self.readers.len());
+            for reader in &mut self.readers {
+                let Some(value) = reader.next_value()? else {
+                    self.finished = true;
+                    return Ok(None);
+                };
+                current.push(value);
             }
+            self.current = current;
         } else if !self.advance()? {
             self.finished = true;
             return Ok(None);
@@ -125,12 +125,14 @@ impl Pitchfork {
         if self.names.is_empty() {
             return Ok(None);
         }
-        let values = self
-            .readers
-            .iter_mut()
-            .map(WordlistReader::next_value)
-            .collect::<io::Result<Option<Vec<_>>>>()?;
-        Ok(values.map(|values| self.names.iter().cloned().zip(values).collect()))
+        let mut values = Vec::with_capacity(self.readers.len());
+        for reader in &mut self.readers {
+            let Some(value) = reader.next_value()? else {
+                return Ok(None);
+            };
+            values.push(value);
+        }
+        Ok(Some(self.names.iter().cloned().zip(values).collect()))
     }
 }
 
