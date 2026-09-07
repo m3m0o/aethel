@@ -88,12 +88,7 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                 None => discover().context("failed to discover network configuration")?,
             };
             validate_network_config(&network)?;
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .context("failed to create run runtime")?
-                .block_on(execution::execute_run(&run, &network))
-                .map_err(AppError::from)
+            run_with_network_lifecycle(&run, &network)
         }
         Command::Network { command } => match command {
             NetworkCommand::Setup(arguments) => {
@@ -124,6 +119,37 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                     .map_err(AppError::from)
             }
         },
+    }
+}
+
+fn run_with_network_lifecycle(
+    run: &RunConfig,
+    network: &NetworkConfig,
+) -> Result<String, AppError> {
+    setup(network)
+        .context("failed to set up network for run")
+        .map_err(AppError::from)?;
+    let execution = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("failed to create run runtime")
+        .map_err(AppError::from)
+        .and_then(|runtime| {
+            runtime
+                .block_on(execution::execute_run(run, network))
+                .map_err(AppError::from)
+        });
+    let cleanup = cleanup(network)
+        .context("failed to restore network state after run")
+        .map_err(AppError::from);
+    match (execution, cleanup) {
+        (Ok(message), Ok(_)) => Ok(message),
+        (Err(error), Ok(_)) => Err(error),
+        (Ok(_), Err(error)) => Err(error),
+        (Err(error), Err(cleanup_error)) => Err(anyhow::anyhow!(
+            "{error}; additionally, network restoration failed: {cleanup_error}"
+        )
+        .into()),
     }
 }
 
