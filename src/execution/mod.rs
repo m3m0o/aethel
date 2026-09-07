@@ -93,7 +93,9 @@ impl AddressAllocator {
     }
     fn allocate(&self) -> Result<Ipv6Addr> {
         let iid = self.unique_iid()?;
-        Ok(Ipv6Addr::from((u128::from(self.prefix) << 64) | iid))
+        Ok(Ipv6Addr::from(
+            (u128::from(self.prefix) << 64) | u128::from(iid),
+        ))
     }
     fn unique_iid(&self) -> Result<u64> {
         let mut used = self.used.lock().expect("address allocator mutex poisoned");
