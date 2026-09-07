@@ -8,7 +8,7 @@ use super::substitute::substitute;
 
 pub fn parse(
     raw: &str,
-    base_url: &str,
+    base_url: Option<&str>,
     values: &BTreeMap<String, String>,
 ) -> Result<PreparedRequest> {
     let (head, body) = raw
@@ -55,10 +55,17 @@ pub fn parse(
     }
 
     let target = substitute(target, values)?;
-    let base_url = reqwest::Url::parse(base_url).context("invalid base URL")?;
-    let url = base_url
-        .join(&target)
-        .context("invalid request target URL")?;
+    let url = match reqwest::Url::parse(&target) {
+        Ok(url) if url.has_authority() => url,
+        _ => {
+            let base_url = base_url
+                .ok_or_else(|| anyhow::anyhow!("relative request target requires a base URL"))?;
+            reqwest::Url::parse(base_url)
+                .context("invalid base URL")?
+                .join(&target)
+                .context("invalid request target URL")?
+        }
+    };
     let body = substitute(body, values)?.into_bytes();
     Ok(PreparedRequest {
         method,

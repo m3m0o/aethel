@@ -17,17 +17,28 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Validate a run configuration and its network configuration.
+    /// Run a finite HTTP payload job.
     Run {
-        /// Path to the run TOML file.
-        #[arg(long, value_name = "FILE")]
-        config: PathBuf,
-        /// Path to the network TOML file.
-        #[arg(long, value_name = "FILE")]
-        network: PathBuf,
-        /// Override the worker count from the run configuration.
-        #[arg(long, value_name = "COUNT")]
-        workers: Option<u16>,
+        /// Optional run TOML; CLI flags override values from this file.
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Optional network TOML; omitted uses Linux network discovery.
+        #[arg(long)]
+        network: Option<PathBuf>,
+        /// Base URL with scheme, required without an absolute request target.
+        #[arg(short = 'u', long)]
+        url: Option<String>,
+        /// HTTP request template file.
+        #[arg(short = 'r', long)]
+        request: Option<PathBuf>,
+        /// Repeated NAME:PATH wordlist mapping.
+        #[arg(short = 'w', long = "wordlist")]
+        wordlists: Vec<String>,
+        #[arg(short = 'c', long, visible_alias = "workers")]
+        concurrency: Option<u16>,
+        /// Repeated stop condition NAME=VALUE.
+        #[arg(short = 's', long = "stop")]
+        stops: Vec<String>,
     },
     /// Inspect or change the configured network.
     Network {
