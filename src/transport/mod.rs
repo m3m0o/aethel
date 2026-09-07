@@ -12,7 +12,7 @@ pub struct ClientGeneration(pub u64);
 pub struct SourceBoundClient {
     generation: ClientGeneration,
     local_address: IpAddr,
-    fallback_to_http1: bool,
+    reject_http1_fallback: bool,
     client: reqwest::Client,
 }
 
@@ -46,7 +46,8 @@ impl SourceBoundClient {
         Ok(Self {
             generation,
             local_address,
-            fallback_to_http1: config.fallback_to_http1,
+            reject_http1_fallback: matches!(config.version, HttpVersion::Auto)
+                && !config.fallback_to_http1,
             client,
         })
     }
@@ -73,7 +74,7 @@ impl SourceBoundClient {
                     self.local_address
                 )
             })?;
-        if !self.fallback_to_http1 && response.version() == reqwest::Version::HTTP_11 {
+        if self.reject_http1_fallback && response.version() == reqwest::Version::HTTP_11 {
             return Err(anyhow::anyhow!(
                 "server negotiated HTTP/1.1 while HTTP/1.1 fallback is disabled"
             ));
