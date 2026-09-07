@@ -21,6 +21,23 @@ pub struct AddressAllocator {
     used: Arc<Mutex<HashSet<u64>>>,
 }
 impl AddressAllocator {
+    pub fn rotate(&self, worker: usize) -> Result<()> {
+        let mut workers = self
+            .workers
+            .lock()
+            .expect("address allocator mutex poisoned");
+        if worker >= workers.len() {
+            anyhow::bail!("worker index {worker} is outside configured worker count");
+        }
+        match self.mode {
+            AddressMode::Worker => workers[worker] = None,
+            AddressMode::Pool => {
+                *self.pool.lock().expect("address allocator mutex poisoned") = None;
+            }
+            AddressMode::Request => {}
+        }
+        Ok(())
+    }
     pub fn new(prefix: &str, mode: AddressMode, worker_count: u16) -> Result<Self> {
         let (address, length) = prefix
             .split_once('/')
