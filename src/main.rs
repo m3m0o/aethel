@@ -9,7 +9,7 @@ use clap::Parser;
 use cli::{Cli, Command, NetworkCommand};
 use config::{load_network, load_run};
 use error::AppError;
-use network::{configured_summary, host_summary};
+use network::{cleanup, configured_summary, host_summary, setup};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -62,11 +62,21 @@ fn execute(cli: Cli) -> Result<String, AppError> {
             ))
         }
         Command::Network { command } => match command {
-            NetworkCommand::Setup { config } | NetworkCommand::Cleanup { config } => {
-                load_network(&config).with_context(|| {
+            NetworkCommand::Setup { config } => {
+                let network = load_network(&config).with_context(|| {
                     format!("failed to load network configuration: {}", config.display())
                 })?;
-                Ok(format!("network configuration valid: {}", config.display()))
+                setup(&network)
+                    .with_context(|| format!("failed to set up network: {}", config.display()))
+                    .map_err(AppError::from)
+            }
+            NetworkCommand::Cleanup { config } => {
+                let network = load_network(&config).with_context(|| {
+                    format!("failed to load network configuration: {}", config.display())
+                })?;
+                cleanup(&network)
+                    .with_context(|| format!("failed to clean up network: {}", config.display()))
+                    .map_err(AppError::from)
             }
             NetworkCommand::Check {
                 config: Some(config),
