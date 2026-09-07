@@ -54,7 +54,7 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                 Some(path) => load_run(&path).with_context(|| {
                     format!("failed to load run configuration: {}", path.display())
                 })?,
-                None => build_cli_run(request, url)?,
+                None => build_cli_run(request.clone(), url.clone())?,
             };
             if let Some(path) = request {
                 run.request.file = path;
