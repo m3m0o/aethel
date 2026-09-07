@@ -16,7 +16,7 @@ pub fn host_summary() -> Result<String> {
     #[cfg(target_os = "linux")]
     {
         let snapshot = inspect_host(None)?;
-        return Ok(format_snapshot(&snapshot));
+        Ok(format_snapshot(&snapshot))
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -49,7 +49,7 @@ fn inspect_host(config: Option<&NetworkConfig>) -> Result<NetworkSnapshot> {
             })
             .unwrap_or(BackendState::Native);
 
-        return Ok(NetworkSnapshot {
+        Ok(NetworkSnapshot {
             interface: interface.to_owned(),
             interface_index,
             routes,
@@ -57,7 +57,7 @@ fn inspect_host(config: Option<&NetworkConfig>) -> Result<NetworkSnapshot> {
             capabilities,
             ndp_backend,
             restoration_available: config.is_some(),
-        });
+        })
     }
 
     #[cfg(not(target_os = "linux"))]
