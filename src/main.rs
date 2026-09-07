@@ -5,6 +5,7 @@ mod logging;
 pub mod network;
 pub mod payload;
 pub mod request;
+pub mod transport;
 
 use anyhow::{Context, Result};
 use clap::Parser;
