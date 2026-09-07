@@ -1,4 +1,7 @@
+mod connection;
+
 use anyhow::{Context, Result};
+pub use connection::{ConnectionLifecycle, RequestAdmission, RequestGuard};
 use futures_util::StreamExt;
 use reqwest::header::HeaderMap;
 use std::collections::HashMap;
