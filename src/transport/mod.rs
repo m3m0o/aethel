@@ -107,15 +107,12 @@ mod tests {
     #[test]
     fn creates_independent_clients_per_generation() {
         let address = IpAddr::V6(Ipv6Addr::LOCALHOST);
-        let first = SourceBoundClient::new(ClientGeneration(1), address, &config(), HeaderMap::new())
-            .unwrap();
-        let second = SourceBoundClient::new(
-            ClientGeneration(2),
-            address,
-            &config(),
-            HeaderMap::new(),
-        )
-        .unwrap();
+        let first =
+            SourceBoundClient::new(ClientGeneration(1), address, &config(), HeaderMap::new())
+                .unwrap();
+        let second =
+            SourceBoundClient::new(ClientGeneration(2), address, &config(), HeaderMap::new())
+                .unwrap();
         assert_ne!(first.generation(), second.generation());
     }
 
