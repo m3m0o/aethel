@@ -196,7 +196,7 @@ fn format_snapshot(snapshot: &NetworkSnapshot) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::snapshot::RouteState;
+    use super::super::snapshot::RouteState;
 
     #[test]
     fn route_state_keeps_optional_fields() {
