@@ -283,6 +283,20 @@ pub fn load_network(path: &Path) -> Result<NetworkConfig, ConfigError> {
     Ok(config)
 }
 
+pub fn validate_network_config(config: &NetworkConfig) -> Result<(), ConfigError> {
+    validate_network(config, Path::new("<cli>"))
+}
+
+pub fn parse_ndp_backend(value: &str) -> Result<NdpBackend, ConfigError> {
+    match value {
+        "native" => Ok(NdpBackend::Native),
+        "ndppd" => Ok(NdpBackend::Ndppd),
+        other => Err(ConfigError::new(format!(
+            "<cli> [network.backend]: expected 'native' or 'ndppd', got '{other}'"
+        ))),
+    }
+}
+
 pub fn load_run(path: &Path) -> Result<RunConfig, ConfigError> {
     let contents = read_file(path)?;
     let config = toml::from_str::<RunConfig>(&contents).map_err(|error| {
