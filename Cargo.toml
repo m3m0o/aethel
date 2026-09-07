@@ -9,8 +9,12 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+futures-util = "0.3"
+netlink-packet-route = "0.25"
+rtnetlink = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 toml = "0.9"
+tokio = { version = "1.47", features = ["net", "rt"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
