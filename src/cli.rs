@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -38,22 +38,32 @@ pub enum Command {
 
 #[derive(Debug, Subcommand)]
 pub enum NetworkCommand {
-    /// Validate the network configuration before setup.
-    Setup {
-        /// Path to the network TOML file.
-        #[arg(long, value_name = "FILE")]
-        config: PathBuf,
-    },
-    /// Inspect current network state, optionally against a network TOML file.
-    Check {
-        /// Optional path to the expected network TOML file.
-        #[arg(long, value_name = "FILE")]
-        config: Option<PathBuf>,
-    },
-    /// Validate the network configuration before cleanup.
-    Cleanup {
-        /// Path to the network TOML file.
-        #[arg(long, value_name = "FILE")]
-        config: PathBuf,
-    },
+    /// Create the configured local AnyIP route.
+    Setup(NetworkArguments),
+    /// Inspect current network state.
+    Check(NetworkArguments),
+    /// Remove the local AnyIP route owned by this execution.
+    Cleanup(NetworkArguments),
+}
+
+#[derive(Debug, Args)]
+pub struct NetworkArguments {
+    /// Optional path to the network TOML file.
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+    /// Network interface used for IPv6 traffic.
+    #[arg(long, value_name = "NAME")]
+    pub interface: Option<String>,
+    /// IPv6 prefix managed by AnyIP.
+    #[arg(long, value_name = "PREFIX")]
+    pub prefix: Option<String>,
+    /// Loopback interface receiving the local route.
+    #[arg(long, value_name = "NAME")]
+    pub loopback: Option<String>,
+    /// NDP backend: native or ndppd.
+    #[arg(long, value_name = "BACKEND")]
+    pub backend: Option<String>,
+    /// Runtime state directory.
+    #[arg(long, value_name = "DIR")]
+    pub state_root: Option<PathBuf>,
 }
