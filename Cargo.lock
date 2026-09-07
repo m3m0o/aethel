@@ -12,6 +12,7 @@ dependencies = [
  "netlink-packet-route",
  "rtnetlink",
  "serde",
+ "socket2",
  "thiserror 2.0.20",
  "tokio",
  "toml",
