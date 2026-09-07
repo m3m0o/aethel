@@ -152,6 +152,19 @@ fn route_state(message: RouteMessage) -> Result<RouteState> {
         output_interface,
     })
 }
+#[cfg(target_os = "linux")]
+fn format_route_address(address: RouteAddress, prefix_length: u8) -> String {
+    match address {
+        RouteAddress::Inet6(address) => format!("{address}/{prefix_length}"),
+        RouteAddress::Inet(address) => format!("{address}/{prefix_length}"),
+        other => format!("{other:?}/{prefix_length}"),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn route_type_name(route_type: RouteType) -> String {
+    format!("{route_type:?}").to_lowercase()
+}
 
 fn format_snapshot(snapshot: &NetworkSnapshot, configured_prefix: Option<&str>) -> String {
     let routes = snapshot
