@@ -9,7 +9,7 @@ pub struct StopPolicy {
     pub stop_on_match: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StopState {
     started: Instant,
     requests: u64,
