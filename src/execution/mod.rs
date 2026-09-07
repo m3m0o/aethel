@@ -6,7 +6,6 @@ pub use rotation::RotationState;
 
 use crate::config::AddressMode;
 use anyhow::{Context, Result};
-pub use rotation::RotationState;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -18,6 +17,7 @@ pub struct AddressAllocator {
     prefix: u64,
     mode: AddressMode,
     workers: Arc<Mutex<Vec<Option<Ipv6Addr>>>>,
+    pool: Arc<Mutex<Option<Ipv6Addr>>>,
     used: Arc<Mutex<HashSet<u64>>>,
 }
 impl AddressAllocator {
@@ -41,6 +41,7 @@ impl AddressAllocator {
             prefix: u128::from(address) as u64,
             mode,
             workers: Arc::new(Mutex::new(vec![None; worker_count as usize])),
+            pool: Arc::new(Mutex::new(None)),
             used: Arc::new(Mutex::new(HashSet::new())),
         })
     }
@@ -57,12 +58,24 @@ impl AddressAllocator {
                 return Ok(address);
             }
         }
-        let iid = self.unique_iid()?;
-        let address = Ipv6Addr::from((u128::from(self.prefix) << 64) | iid);
+        if matches!(self.mode, AddressMode::Pool) {
+            let mut pool = self.pool.lock().expect("address allocator mutex poisoned");
+            if let Some(address) = *pool {
+                return Ok(address);
+            }
+            let address = self.allocate()?;
+            *pool = Some(address);
+            return Ok(address);
+        }
+        let address = self.allocate()?;
         if matches!(self.mode, AddressMode::Worker) {
             workers[worker] = Some(address);
         }
         Ok(address)
+    }
+    fn allocate(&self) -> Result<Ipv6Addr> {
+        let iid = self.unique_iid()?;
+        Ok(Ipv6Addr::from((u128::from(self.prefix) << 64) | iid))
     }
     fn unique_iid(&self) -> Result<u64> {
         let mut used = self.used.lock().expect("address allocator mutex poisoned");
@@ -99,5 +112,10 @@ mod tests {
         assert!(AddressAllocator::new("2001:db8::/63", AddressMode::Pool, 1).is_err());
         let a = AddressAllocator::new("2001:db8::/64", AddressMode::Pool, 1).unwrap();
         assert!(a.next(1).is_err());
+    }
+    #[test]
+    fn pool_mode_reuses_one_address_across_workers() {
+        let pool = AddressAllocator::new("2001:db8::/64", AddressMode::Pool, 2).unwrap();
+        assert_eq!(pool.next(0).unwrap(), pool.next(1).unwrap());
     }
 }
