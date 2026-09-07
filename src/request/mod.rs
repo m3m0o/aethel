@@ -21,8 +21,8 @@ mod tests {
         let raw = "POST /login HTTP/1.1\nHost: example.test\nContent-Type: application/json\nX-User: {{username}}\n\n{\"password\":\"{{password}}\"}";
         let toml = "method = 'POST'\npath = '/login'\n\n[headers]\nHost = 'example.test'\nContent-Type = 'application/json'\nX-User = '{{username}}'\n\nbody = '{\"password\":\"{{password}}\"}'";
         assert_eq!(
-            parse_raw(raw, "https://example.test", &values).unwrap(),
-            parse_toml(toml, "https://example.test", &values).unwrap()
+            parse_raw(raw, Some("https://example.test"), &values).unwrap(),
+            parse_toml(toml, Some("https://example.test"), &values).unwrap()
         );
     }
 }

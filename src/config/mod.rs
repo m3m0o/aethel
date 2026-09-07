@@ -116,7 +116,7 @@ pub struct RequestSection {
     #[serde(default = "default_request_format")]
     pub format: RequestFormat,
     pub file: PathBuf,
-    pub base_url: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -150,6 +150,8 @@ pub enum PayloadMode {
 pub struct ExecutionSection {
     #[serde(default = "default_workers")]
     pub workers: u16,
+    #[serde(default = "default_concurrency")]
+    pub concurrency: u16,
     #[serde(default)]
     pub address_mode: AddressMode,
 }
@@ -158,6 +160,7 @@ impl Default for ExecutionSection {
     fn default() -> Self {
         Self {
             workers: default_workers(),
+            concurrency: default_concurrency(),
             address_mode: AddressMode::Worker,
         }
     }
@@ -347,10 +350,18 @@ fn validate_run(config: &RunConfig, path: &Path) -> Result<(), ConfigError> {
         "request",
         "file",
     )?;
-    validate_url(&config.request.base_url, path)?;
+    if let Some(base_url) = &config.request.base_url {
+        validate_url(base_url, path)?;
+    }
     if config.execution.workers == 0 || config.execution.workers > MAX_WORKERS {
         return Err(ConfigError::new(format!(
             "{} [execution.workers]: expected a value from 1 to {MAX_WORKERS}",
+            path.display()
+        )));
+    }
+    if config.execution.concurrency == 0 || config.execution.concurrency > MAX_WORKERS {
+        return Err(ConfigError::new(format!(
+            "{} [execution.concurrency]: expected a value from 1 to {MAX_WORKERS}",
             path.display()
         )));
     }
@@ -468,6 +479,9 @@ fn default_state_root() -> PathBuf {
 }
 
 fn default_workers() -> u16 {
+    1
+}
+fn default_concurrency() -> u16 {
     1
 }
 
