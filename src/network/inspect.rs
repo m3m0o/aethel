@@ -167,34 +167,69 @@ fn route_type_name(route_type: RouteType) -> String {
 }
 
 fn format_snapshot(snapshot: &NetworkSnapshot, configured_prefix: Option<&str>) -> String {
-    let routes = snapshot
-        .routes
-        .iter()
-        .map(|route| {
-            format!(
-                "{} {} table={} oif={}",
-                route.kind,
-                route.destination.as_deref().unwrap_or("default"),
-                route.table,
-                route.output_interface.as_deref().unwrap_or("-")
-            )
-        })
-        .collect::<Vec<_>>();
-    let prefix = configured_prefix
-        .map(|value| format!(" prefix={value},"))
-        .unwrap_or_default();
-    format!(
-        "network state: interface={} (index {}),{} routes=[{}], sysctls={:?}, capabilities=CAP_NET_ADMIN:{} CAP_NET_RAW:{}, ndp_backend={:?}, restoration_available={}",
-        snapshot.interface,
-        snapshot.interface_index,
-        prefix,
-        routes.join("; "),
-        snapshot.sysctls,
-        snapshot.capabilities.net_admin,
-        snapshot.capabilities.net_raw,
-        snapshot.ndp_backend,
-        snapshot.restoration_available
-    )
+    let mut lines = vec![
+        "Network status".to_owned(),
+        format!(
+            "[+] Interface: {} (index {})",
+            snapshot.interface, snapshot.interface_index
+        ),
+    ];
+    if let Some(prefix) = configured_prefix {
+        let route = snapshot.routes.iter().find(|route| {
+            route.destination.as_deref() == Some(prefix)
+                && route.kind == "local"
+                && route.output_interface.as_deref() == Some(&snapshot.interface_index.to_string())
+        });
+        match route {
+            Some(_) => lines.push(format!(
+                "[+] AnyIP route: {prefix} via {}",
+                snapshot.interface
+            )),
+            None => lines.push(format!(
+                "[-] AnyIP route missing: {prefix} via {}",
+                snapshot.interface
+            )),
+        }
+    } else {
+        lines.push(format!("[+] Routes visible: {}", snapshot.routes.len()));
+    }
+    let forwarding = snapshot
+        .sysctls
+        .get("net.ipv6.conf.all.forwarding")
+        .map(String::as_str)
+        .unwrap_or("unknown");
+    lines.push(if forwarding == "1" {
+        "[+] IPv6 forwarding enabled".to_owned()
+    } else {
+        format!("[!] IPv6 forwarding disabled (value: {forwarding})")
+    });
+    let bind = snapshot
+        .sysctls
+        .get("net.ipv6.ip_nonlocal_bind")
+        .map(String::as_str)
+        .unwrap_or("unknown");
+    lines.push(if bind == "1" {
+        "[+] Non-local IPv6 bind enabled".to_owned()
+    } else {
+        format!("[!] Non-local IPv6 bind disabled (value: {bind})")
+    });
+    lines.push(if snapshot.capabilities.net_admin {
+        "[+] CAP_NET_ADMIN available".to_owned()
+    } else {
+        "[-] CAP_NET_ADMIN missing: network setup requires root or this capability".to_owned()
+    });
+    lines.push(if snapshot.capabilities.net_raw {
+        "[+] CAP_NET_RAW available".to_owned()
+    } else {
+        "[-] CAP_NET_RAW missing: native NDP requires root or this capability".to_owned()
+    });
+    lines.push(format!("[+] NDP backend: {:?}", snapshot.ndp_backend));
+    lines.push(if snapshot.restoration_available {
+        "[+] Network restoration snapshot available".to_owned()
+    } else {
+        "[!] No restoration snapshot: run with a network configuration".to_owned()
+    });
+    lines.join("\n")
 }
 
 #[cfg(test)]

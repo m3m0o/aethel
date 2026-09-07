@@ -28,7 +28,7 @@ fn main() -> ExitCode {
         }
         Err(error) => {
             tracing::error!(error = %error, "application failed");
-            eprintln!("error: {error}");
+            eprintln!("error: {error:#}");
             ExitCode::from(error.exit_code())
         }
     }
