@@ -1,5 +1,8 @@
+mod rotation;
+
 use crate::config::AddressMode;
 use anyhow::{Context, Result};
+pub use rotation::RotationState;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;

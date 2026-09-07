@@ -237,6 +237,8 @@ pub struct RotationSection {
     pub connection_policy: ConnectionPolicy,
     #[serde(default = "default_drain_timeout")]
     pub drain_timeout_ms: u64,
+    pub every_requests: Option<u64>,
+    pub every_ms: Option<u64>,
 }
 
 impl Default for RotationSection {
@@ -245,6 +247,8 @@ impl Default for RotationSection {
             scope: RotationScope::Worker,
             connection_policy: ConnectionPolicy::Drain,
             drain_timeout_ms: default_drain_timeout(),
+            every_requests: None,
+            every_ms: None,
         }
     }
 }
@@ -355,6 +359,12 @@ fn validate_run(config: &RunConfig, path: &Path) -> Result<(), ConfigError> {
     if config.http.total_timeout_ms == 0 {
         return Err(ConfigError::new(format!(
             "{} [http.total_timeout_ms]: must be greater than zero",
+            path.display()
+        )));
+    }
+    if config.rotation.every_requests == Some(0) || config.rotation.every_ms == Some(0) {
+        return Err(ConfigError::new(format!(
+            "{} [rotation]: intervals must be greater than zero",
             path.display()
         )));
     }
