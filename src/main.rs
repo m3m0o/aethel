@@ -1,6 +1,7 @@
 mod cli;
 pub mod config;
 mod error;
+pub mod execution;
 mod logging;
 pub mod network;
 pub mod payload;
