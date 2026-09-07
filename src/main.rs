@@ -175,10 +175,14 @@ fn apply_stop_flags(stop: &mut StopSection, flags: &[String]) -> Result<(), AppE
             .split_once('=')
             .ok_or_else(|| anyhow::anyhow!("invalid --stop '{flag}'; expected NAME=VALUE"))?;
         match name {
-            "max-requests" => stop.max_requests = Some(value.parse()?),
-            "max-duration-ms" => stop.max_duration_ms = Some(value.parse()?),
-            "max-errors" => stop.max_errors = Some(value.parse()?),
-            "max-error-ratio" => stop.max_error_ratio = Some(value.parse()?),
+            "max-requests" => stop.max_requests = Some(parse_stop_u64(value, flag)?),
+            "max-duration-ms" => stop.max_duration_ms = Some(parse_stop_u64(value, flag)?),
+            "max-errors" => stop.max_errors = Some(parse_stop_u64(value, flag)?),
+            "max-error-ratio" => {
+                stop.max_error_ratio = Some(value.parse().map_err(|_| {
+                    anyhow::anyhow!("invalid --stop '{flag}'; expected a number from 0 to 1")
+                })?)
+            }
             "on-match" => {
                 stop.stop_on_match = value.parse().map_err(|_| {
                     anyhow::anyhow!("invalid --stop '{flag}'; on-match expects true or false")
@@ -188,4 +192,10 @@ fn apply_stop_flags(stop: &mut StopSection, flags: &[String]) -> Result<(), AppE
         }
     }
     Ok(())
+}
+
+fn parse_stop_u64(value: &str, flag: &str) -> Result<u64, AppError> {
+    value.parse().map_err(|_| {
+        anyhow::anyhow!("invalid --stop '{flag}'; expected a non-negative integer").into()
+    })
 }
