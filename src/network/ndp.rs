@@ -1,4 +1,5 @@
 use super::capabilities;
+use anyhow::{Context, Result};
 use std::io;
 use std::net::{Ipv6Addr, SocketAddrV6};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,9 +18,8 @@ impl NeighborSolicitation {
         if packet.len() < 24 || packet[0] != NEIGHBOR_SOLICITATION || packet[1] != 0 {
             return None;
         }
-        Some(Self {
-            target: Ipv6Addr::from(packet[8..24].try_into().ok()?),
-        })
+        let target = Ipv6Addr::from(<[u8; 16]>::try_from(&packet[8..24]).ok()?);
+        Some(Self { target })
     }
 }
 
