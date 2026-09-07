@@ -130,9 +130,13 @@ mod tests {
         let mut http1_config = config();
         http1_config.version = HttpVersion::Http1;
         http1_config.fallback_to_http1 = false;
-        let http1 =
-            SourceBoundClient::new(ClientGeneration(2), address, &http1_config, HeaderMap::new())
-                .unwrap();
+        let http1 = SourceBoundClient::new(
+            ClientGeneration(2),
+            address,
+            &http1_config,
+            HeaderMap::new(),
+        )
+        .unwrap();
         assert!(!http1.reject_http1_fallback);
     }
 
