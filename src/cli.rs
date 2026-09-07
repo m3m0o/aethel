@@ -42,6 +42,8 @@ pub enum NetworkCommand {
     Setup(NetworkArguments),
     /// Inspect current network state.
     Check(NetworkArguments),
+    /// Remove the local AnyIP route owned by this execution.
+    Cleanup(NetworkArguments),
     /// Remove only network state owned by this execution after an interrupted run.
     Recover(NetworkArguments),
 }
