@@ -147,7 +147,7 @@ impl SourceBoundClient {
         rules: &[Rule],
         body_directory: impl AsRef<Path>,
         max_body_bytes: u64,
-    ) -> Result<(Decision, Option<std::path::PathBuf>)> {
+    ) -> Result<(u16, Decision, Option<std::path::PathBuf>)> {
         let response = self.execute(request).await?;
         let status = response.status().as_u16();
         let headers = response.headers().clone();
@@ -172,7 +172,7 @@ impl SourceBoundClient {
         let saved_body = body_store
             .finish(decision.save_body)
             .context("failed to finalize response body store")?;
-        Ok((decision, saved_body))
+        Ok((status, decision, saved_body))
     }
 
     pub fn client(&self) -> &reqwest::Client {

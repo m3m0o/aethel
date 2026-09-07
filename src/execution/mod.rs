@@ -113,7 +113,7 @@ impl AddressAllocator {
         anyhow::bail!("failed to allocate a unique IPv6 IID")
     }
 }
-
+#[derive(Clone)]
 pub struct WorkerCoordinator {
     allocator: AddressAllocator,
     states: Arc<Mutex<Vec<RotationState>>>,
