@@ -161,8 +161,8 @@ pub fn validate_wordlists(
 
 #[cfg(test)]
 mod tests {
-    use super::{Clusterbomb, Pitchfork, WordlistReader};
-    use std::collections::BTreeMap;
+    use super::{validate_wordlists, Clusterbomb, Pitchfork, WordlistReader};
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::PathBuf;
 
@@ -213,5 +213,39 @@ mod tests {
         assert!(generator.next_payload().unwrap().is_none());
         fs::remove_file(first).unwrap();
         fs::remove_file(second).unwrap();
+    }
+    #[test]
+    fn empty_lines_and_unicode_are_valid_payloads() {
+        let path = fixture("empty-unicode", "\nこんにちは\n");
+        let mut reader = WordlistReader::open(&path).unwrap();
+        assert_eq!(reader.next_value().unwrap().as_deref(), Some(""));
+        assert_eq!(reader.next_value().unwrap().as_deref(), Some("こんにちは"));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn empty_wordlist_produces_no_payloads() {
+        let path = fixture("empty-list", "");
+        let mut lists = BTreeMap::new();
+        lists.insert("value".to_owned(), path.clone());
+        let mut generator = Clusterbomb::open(lists).unwrap();
+        assert!(generator.next_payload().unwrap().is_none());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn validates_placeholder_and_wordlist_names() {
+        let path = fixture("validation", "value\n");
+        let mut placeholders = BTreeSet::new();
+        placeholders.insert("missing".to_owned());
+        let mut wordlists = BTreeMap::new();
+        wordlists.insert("value".to_owned(), path.clone());
+        assert!(validate_wordlists(&placeholders, &wordlists).is_err());
+
+        placeholders.clear();
+        placeholders.insert("value".to_owned());
+        wordlists.insert("unused".to_owned(), path.clone());
+        assert!(validate_wordlists(&placeholders, &wordlists).is_err());
+        fs::remove_file(path).unwrap();
     }
 }
