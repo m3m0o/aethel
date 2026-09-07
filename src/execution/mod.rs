@@ -135,4 +135,11 @@ mod tests {
         let pool = AddressAllocator::new("2001:db8::/64", AddressMode::Pool, 2).unwrap();
         assert_eq!(pool.next(0).unwrap(), pool.next(1).unwrap());
     }
+    #[test]
+    fn worker_rotation_assigns_a_new_address() {
+        let allocator = AddressAllocator::new("2001:db8::/64", AddressMode::Worker, 1).unwrap();
+        let first = allocator.next(0).unwrap();
+        allocator.rotate(0).unwrap();
+        assert_ne!(first, allocator.next(0).unwrap());
+    }
 }
