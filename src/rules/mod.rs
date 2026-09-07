@@ -144,7 +144,7 @@ pub fn evaluate(rules: &[Rule], r: &Response<'_>) -> Result<Decision, regex::Err
     Ok(d)
 }
 pub struct BodyStore {
-    temporary: PathBuf,
+    temporary: Option<PathBuf>,
     file: File,
     max_bytes: u64,
     written: u64,
@@ -163,7 +163,7 @@ impl BodyStore {
             }
         };
         Ok(Self {
-            temporary,
+            temporary: Some(temporary),
             file,
             max_bytes,
             written: 0,
@@ -184,13 +184,22 @@ impl BodyStore {
     pub fn finish(mut self, matched: bool) -> io::Result<Option<PathBuf>> {
         self.file.flush()?;
         drop(self.file);
+        let temporary = self.temporary.take().expect("body store path is present");
         if !matched {
-            fs::remove_file(&self.temporary)?;
+            fs::remove_file(temporary)?;
             return Ok(None);
         }
-        let final_path = self.temporary.with_extension("bin");
-        fs::rename(&self.temporary, &final_path)?;
+        let final_path = temporary.with_extension("bin");
+        fs::rename(temporary, &final_path)?;
         Ok(Some(final_path))
+    }
+}
+
+impl Drop for BodyStore {
+    fn drop(&mut self) {
+        if let Some(path) = self.temporary.take() {
+            let _ = fs::remove_file(path);
+        }
     }
 }
 #[cfg(test)]
