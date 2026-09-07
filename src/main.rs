@@ -9,7 +9,7 @@ use clap::Parser;
 use cli::{Cli, Command, NetworkCommand};
 use config::{load_network, load_run};
 use error::AppError;
-use network::host_summary;
+use network::{configured_summary, host_summary};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -71,14 +71,14 @@ fn execute(cli: Cli) -> Result<String, AppError> {
             NetworkCommand::Check {
                 config: Some(config),
             } => {
-                load_network(&config).with_context(|| {
+                let network = load_network(&config).with_context(|| {
                     format!("failed to load network configuration: {}", config.display())
                 })?;
-                Ok(format!("network configuration valid: {}", config.display()))
+                configured_summary(&network)
+                    .with_context(|| format!("failed to inspect network: {}", config.display()))
+                    .map_err(AppError::from)
             }
-            NetworkCommand::Check { config: None } => host_summary()
-                .map_err(anyhow::Error::msg)
-                .map_err(AppError::from),
+            NetworkCommand::Check { config: None } => host_summary().map_err(AppError::from),
         },
     }
 }
