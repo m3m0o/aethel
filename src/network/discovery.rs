@@ -1,6 +1,5 @@
 use std::fs;
 use std::net::Ipv6Addr;
-use std::str::FromStr;
 
 use anyhow::{Context, Result};
 
@@ -42,8 +41,10 @@ fn default_route_interface() -> Result<String> {
         .context("failed to read IPv6 routes for network discovery")?;
     let interface = routes.lines().find_map(|line| {
         let fields = line.split_whitespace().collect::<Vec<_>>();
-        (fields.len() >= 10 && fields[0].chars().all(|value| value == '0') && fields[1] == "00")
-            .then(|| fields[9].to_owned())
+        (fields.len() >= 10
+            && fields[0].chars().all(|value| value == '0')
+            && fields[1].chars().all(|value| value == '0'))
+        .then(|| fields[9].to_owned())
     });
     interface.ok_or_else(|| anyhow::anyhow!("could not discover the default IPv6 route interface"))
 }
