@@ -13,6 +13,8 @@ use crate::config::NetworkConfig;
 
 use super::inspect::{interface_index, read_routes};
 
+const ROUTE_MARKER: &str = "anyip-route.state";
+
 pub fn setup(config: &NetworkConfig) -> Result<String> {
     let (prefix, prefix_length) = parse_prefix(&config.network.prefix)?;
     let loopback_index = interface_index(&config.network.loopback)?;
