@@ -110,6 +110,7 @@ impl AddressAllocator {
                 return Ok(iid);
             }
         }
+        anyhow::bail!("failed to allocate a unique IPv6 IID")
     }
 }
 #[derive(Clone)]
