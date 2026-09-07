@@ -380,7 +380,7 @@ fn validate_non_empty(
 fn validate_prefix(prefix: &str, path: &Path) -> Result<(), ConfigError> {
     let Some((address, length)) = prefix.split_once('/') else {
         return Err(ConfigError::new(format!(
-            "{} [network.prefix]: expected an IPv6 prefix with /64",
+            "{} [network.prefix]: expected an IPv6 prefix with a length from /64 to /128",
             path.display()
         )));
     };
@@ -390,9 +390,15 @@ fn validate_prefix(prefix: &str, path: &Path) -> Result<(), ConfigError> {
             path.display()
         ))
     })?;
-    if length != "64" {
+    let prefix_length = length.parse::<u8>().map_err(|_| {
+        ConfigError::new(format!(
+            "{} [network.prefix]: invalid prefix length",
+            path.display()
+        ))
+    })?;
+    if !(64..=128).contains(&prefix_length) {
         return Err(ConfigError::new(format!(
-            "{} [network.prefix]: only /64 is supported",
+            "{} [network.prefix]: only prefix lengths from /64 to /128 are supported",
             path.display()
         )));
     }
@@ -503,6 +509,22 @@ base_url = "https://example.test"
             error.to_string(),
             "network.toml [network.version]: unsupported version 2; expected 1"
         );
+    }
+
+    #[test]
+    fn accepts_prefixes_from_64_through_128() {
+        validate_prefix("2001:db8::/70", Path::new("network.toml"))
+            .expect("/70 should be supported");
+        validate_prefix("2001:db8::1/128", Path::new("network.toml"))
+            .expect("/128 should be supported");
+    }
+
+    #[test]
+    fn rejects_prefixes_broader_than_64() {
+        let error = validate_prefix("2001:db8::/63", Path::new("network.toml"))
+            .expect_err("/63 should be rejected");
+
+        assert!(error.to_string().contains("from /64 to /128"));
     }
 
     #[test]
