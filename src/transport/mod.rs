@@ -122,25 +122,17 @@ mod tests {
         let address = IpAddr::V6(Ipv6Addr::LOCALHOST);
         let mut auto_config = config();
         auto_config.fallback_to_http1 = false;
-        let auto = SourceBoundClient::new(
-            ClientGeneration(1),
-            address,
-            &auto_config,
-            HeaderMap::new(),
-        )
-        .unwrap();
+        let auto =
+            SourceBoundClient::new(ClientGeneration(1), address, &auto_config, HeaderMap::new())
+                .unwrap();
         assert!(auto.reject_http1_fallback);
 
         let mut http1_config = config();
         http1_config.version = HttpVersion::Http1;
         http1_config.fallback_to_http1 = false;
-        let http1 = SourceBoundClient::new(
-            ClientGeneration(2),
-            address,
-            &http1_config,
-            HeaderMap::new(),
-        )
-        .unwrap();
+        let http1 =
+            SourceBoundClient::new(ClientGeneration(2), address, &http1_config, HeaderMap::new())
+                .unwrap();
         assert!(!http1.reject_http1_fallback);
     }
 
