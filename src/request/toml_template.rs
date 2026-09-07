@@ -35,17 +35,25 @@ pub fn parse(
         .join(&path)
         .context("invalid structured request path")?;
 
-    let mut headers = reqwest::header::HeaderMap::new();
-    for (name, value) in template.headers {
+    let mut headers = template.headers;
+    let body = if template.body.is_empty() {
+        headers.remove("body").unwrap_or_default()
+    } else {
+        template.body
+    };
+    let body = substitute(&body, values)?.into_bytes();
+
+    let mut request_headers = reqwest::header::HeaderMap::new();
+    for (name, value) in headers {
         let name = HeaderName::from_bytes(name.as_bytes()).context("invalid header name")?;
         let value = substitute(&value, values)?;
         if value.contains(['\r', '\n']) {
             anyhow::bail!("header value contains CR/LF");
         }
-        if headers.contains_key(&name) {
+        if request_headers.contains_key(&name) {
             anyhow::bail!("duplicate header: {name}");
         }
-        headers.insert(
+        request_headers.insert(
             name,
             HeaderValue::from_str(&value).context("invalid header value")?,
         );
@@ -54,7 +62,7 @@ pub fn parse(
     Ok(PreparedRequest {
         method,
         url,
-        headers,
-        body: substitute(&template.body, values)?.into_bytes(),
+        headers: request_headers,
+        body,
     })
 }
