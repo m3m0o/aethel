@@ -69,18 +69,56 @@ pub struct Decision {
 }
 
 impl Condition {
-    pub fn matches(&self, response: &Response<'_>) -> bool {
+    pub fn validate(&self) -> Result<(), regex::Error> {
         match self {
-            Self::All { all } => all.iter().all(|condition| condition.matches(response)),
-            Self::Any { any } => any.iter().any(|condition| condition.matches(response)),
-            Self::Not { not } => !not.matches(response),
+            Self::All { all } => {
+                for condition in all {
+                    condition.validate()?;
+                }
+            }
+            Self::Any { any } => {
+                for condition in any {
+                    condition.validate()?;
+                }
+            }
+            Self::Not { not } => not.validate()?,
+            Self::BodyRegex { body_regex } => {
+                Regex::new(body_regex)?;
+            }
+            Self::Status { .. }
+            | Self::Header { .. }
+            | Self::BodyContains { .. }
+            | Self::BodyEquals { .. }
+            | Self::Json { .. } => {}
+        }
+        Ok(())
+    }
+
+    pub fn matches(&self, response: &Response<'_>) -> Result<bool, regex::Error> {
+        Ok(match self {
+            Self::All { all } => {
+                for condition in all {
+                    if !condition.matches(response)? {
+                        return Ok(false);
+                    }
+                }
+                true
+            }
+            Self::Any { any } => {
+                for condition in any {
+                    if condition.matches(response)? {
+                        return Ok(true);
+                    }
+                }
+                false
+            }
+            Self::Not { not } => !not.matches(response)?,
             Self::Status { status } => response.status == *status,
             Self::Header { header } => {
                 let value = response.headers.get(&header.name);
                 match (value, header.exists, &header.equals) {
-                    (_, Some(exists), _) if !exists => value.is_none(),
+                    (_, Some(false), _) => value.is_none(),
                     (None, _, _) => false,
-                    (Some(_), Some(false), _) => false,
                     (Some(value), _, Some(expected)) => value.to_str().ok() == Some(expected),
                     (Some(_), _, None) => true,
                 }
@@ -89,21 +127,21 @@ impl Condition {
                 String::from_utf8_lossy(response.body).contains(body_contains)
             }
             Self::BodyEquals { body_equals } => response.body == body_equals.as_bytes(),
-            Self::BodyRegex { body_regex } => Regex::new(body_regex)
-                .map(|regex| regex.is_match(&String::from_utf8_lossy(response.body)))
-                .unwrap_or(false),
+            Self::BodyRegex { body_regex } => {
+                Regex::new(body_regex)?.is_match(&String::from_utf8_lossy(response.body))
+            }
             Self::Json { json } => serde_json::from_slice::<serde_json::Value>(response.body)
                 .ok()
-                .and_then(|value| value.pointer(&json.pointer))
-                == Some(&json.equals),
-        }
+                .and_then(|value| value.pointer(&json.pointer).cloned())
+                == Some(json.equals.clone()),
+        })
     }
 }
 
-pub fn evaluate(rules: &[Rule], response: &Response<'_>) -> Decision {
+pub fn evaluate(rules: &[Rule], response: &Response<'_>) -> Result<Decision, regex::Error> {
     let mut decision = Decision::default();
     for rule in rules {
-        if rule.when.matches(response) {
+        if rule.when.matches(response)? {
             decision.matched.insert(rule.name.clone());
             decision.rotate |= rule.action.rotate;
             decision.stop |= rule.action.stop;
@@ -113,7 +151,7 @@ pub fn evaluate(rules: &[Rule], response: &Response<'_>) -> Decision {
             }
         }
     }
-    decision
+    Ok(decision)
 }
 
 pub struct BodyStore {
