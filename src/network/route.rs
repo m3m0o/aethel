@@ -1,11 +1,15 @@
+use std::fs::{self, OpenOptions};
 use std::future::Future;
+use std::io::Write;
 use std::net::Ipv6Addr;
+use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::config::NetworkConfig;
 use anyhow::{Context, Result};
 use netlink_packet_route::route::{RouteScope, RouteType};
 use rtnetlink::RouteMessageBuilder;
+
+use crate::config::NetworkConfig;
 
 use super::inspect::{interface_index, read_routes};
 
@@ -24,7 +28,12 @@ pub fn setup(config: &NetworkConfig) -> Result<String> {
             config.network.loopback
         ),
         None => {
+            remove_stale_marker(config)?;
             add_route(prefix, prefix_length, loopback_index)?;
+            if let Err(error) = write_route_marker(config, prefix, prefix_length, loopback_index) {
+                let _ = delete_route(prefix, prefix_length, loopback_index);
+                return Err(error).context("failed to record AnyIP route ownership");
+            }
             Ok(format!("AnyIP route created: {}", config.network.prefix))
         }
     }
@@ -34,16 +43,33 @@ pub fn cleanup(config: &NetworkConfig) -> Result<String> {
     let (prefix, prefix_length) = parse_prefix(&config.network.prefix)?;
     let loopback_index = interface_index(&config.network.loopback)?;
     let routes = read_routes()?;
+    let Some(owned_route) = route_marker(config)? else {
+        return Ok(format!(
+            "AnyIP route left unchanged (not owned by this execution): {}",
+            config.network.prefix
+        ));
+    };
+    if owned_route != (prefix, prefix_length, loopback_index) {
+        anyhow::bail!("route ownership marker does not match configured prefix or loopback");
+    }
+
     match find_route(&routes, prefix, prefix_length, loopback_index) {
         Some(true) => {
             delete_route(prefix, prefix_length, loopback_index)?;
+            remove_route_marker(config)?;
             Ok(format!("AnyIP route removed: {}", config.network.prefix))
         }
         Some(false) => anyhow::bail!(
             "refusing to remove incompatible route for {}",
             config.network.prefix
         ),
-        None => Ok(format!("AnyIP route absent: {}", config.network.prefix)),
+        None => {
+            remove_route_marker(config)?;
+            Ok(format!(
+                "AnyIP route already absent: {}",
+                config.network.prefix
+            ))
+        }
     }
 }
 
@@ -76,6 +102,72 @@ fn find_route(
             route.kind == "local"
                 && route.output_interface.as_deref() == Some(&loopback_index.to_string())
         })
+}
+
+fn route_marker(config: &NetworkConfig) -> Result<Option<(Ipv6Addr, u8, u32)>> {
+    let path = marker_path(config);
+    let Ok(value) = fs::read_to_string(&path) else {
+        return Ok(None);
+    };
+    let mut lines = value.lines();
+    let prefix = lines
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("invalid route ownership marker: {}", path.display()))?;
+    let index = lines
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("invalid route ownership marker: {}", path.display()))?;
+    if lines.next().is_some() {
+        anyhow::bail!("invalid route ownership marker: {}", path.display());
+    }
+    let (address, length) = parse_prefix(prefix)?;
+    let index = index
+        .parse::<u32>()
+        .with_context(|| format!("invalid route ownership interface index: {index}"))?;
+    Ok(Some((address, length, index)))
+}
+
+fn write_route_marker(
+    config: &NetworkConfig,
+    prefix: Ipv6Addr,
+    prefix_length: u8,
+    loopback_index: u32,
+) -> Result<()> {
+    fs::create_dir_all(&config.state.root).with_context(|| {
+        format!(
+            "failed to create state directory {}",
+            config.state.root.display()
+        )
+    })?;
+    let path = marker_path(config);
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&path)
+        .with_context(|| format!("failed to create route ownership marker {}", path.display()))?;
+    writeln!(file, "{prefix}/{prefix_length}")?;
+    writeln!(file, "{loopback_index}")?;
+    Ok(())
+}
+
+fn remove_stale_marker(config: &NetworkConfig) -> Result<()> {
+    match route_marker(config)? {
+        Some(_) => remove_route_marker(config),
+        None => Ok(()),
+    }
+}
+
+fn remove_route_marker(config: &NetworkConfig) -> Result<()> {
+    let path = marker_path(config);
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error)
+            .with_context(|| format!("failed to remove route ownership marker {}", path.display())),
+    }
+}
+
+fn marker_path(config: &NetworkConfig) -> PathBuf {
+    config.state.root.join(ROUTE_MARKER)
 }
 
 fn add_route(prefix: Ipv6Addr, prefix_length: u8, loopback_index: u32) -> Result<()> {
