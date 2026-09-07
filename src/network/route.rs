@@ -122,7 +122,7 @@ fn delete_route(prefix: Ipv6Addr, prefix_length: u8, loopback_index: u32) -> Res
 
 fn run_netlink<F>(operation: F) -> Result<()>
 where
-    F: std::future::Future<Output = Result<()>>,
+    F: Future<Output = Result<()>>,
 {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_io()
