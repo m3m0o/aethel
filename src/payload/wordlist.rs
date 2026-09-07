@@ -161,7 +161,7 @@ pub fn validate_wordlists(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_wordlists, Clusterbomb, Pitchfork, WordlistReader};
+    use super::{Clusterbomb, Pitchfork, WordlistReader, validate_wordlists};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::PathBuf;
