@@ -1,0 +1,9 @@
+[package]
+name = "aethel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "IPv6 AnyIP HTTP automation CLI"
+license = "MIT"
+
+[dependencies]
