@@ -47,6 +47,7 @@ fn execute(cli: Cli) -> Result<String, AppError> {
             request,
             wordlists,
             concurrency,
+            workers,
             stops,
         } => {
             let mut run = match config {
@@ -71,7 +72,10 @@ fn execute(cli: Cli) -> Result<String, AppError> {
                 run.wordlists.insert(name.to_owned(), path.to_owned());
             }
             if let Some(concurrency) = concurrency {
-                run.execution.workers = concurrency;
+                run.execution.concurrency = concurrency;
+            }
+            if let Some(workers) = workers {
+                run.execution.workers = workers;
             }
             apply_stop_flags(&mut run.stop, &stops)?;
             let network = match network {
@@ -82,8 +86,8 @@ fn execute(cli: Cli) -> Result<String, AppError> {
             };
             validate_network_config(&network)?;
             Ok(format!(
-                "run configuration valid: {} worker(s), network {}",
-                run.execution.workers, network.network.prefix
+                "run configuration valid: {} worker(s), {} concurrent request(s), network {}",
+                run.execution.workers, run.execution.concurrency, network.network.prefix
             ))
         }
         Command::Network { command } => match command {

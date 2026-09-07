@@ -150,6 +150,8 @@ pub enum PayloadMode {
 pub struct ExecutionSection {
     #[serde(default = "default_workers")]
     pub workers: u16,
+    #[serde(default = "default_concurrency")]
+    pub concurrency: u16,
     #[serde(default)]
     pub address_mode: AddressMode,
 }
@@ -158,6 +160,7 @@ impl Default for ExecutionSection {
     fn default() -> Self {
         Self {
             workers: default_workers(),
+            concurrency: default_concurrency(),
             address_mode: AddressMode::Worker,
         }
     }
@@ -356,6 +359,12 @@ fn validate_run(config: &RunConfig, path: &Path) -> Result<(), ConfigError> {
             path.display()
         )));
     }
+    if config.execution.concurrency == 0 || config.execution.concurrency > MAX_WORKERS {
+        return Err(ConfigError::new(format!(
+            "{} [execution.concurrency]: expected a value from 1 to {MAX_WORKERS}",
+            path.display()
+        )));
+    }
     if config.http.connect_timeout_ms == 0 {
         return Err(ConfigError::new(format!(
             "{} [http.connect_timeout_ms]: must be greater than zero",
@@ -470,6 +479,9 @@ fn default_state_root() -> PathBuf {
 }
 
 fn default_workers() -> u16 {
+    1
+}
+fn default_concurrency() -> u16 {
     1
 }
 

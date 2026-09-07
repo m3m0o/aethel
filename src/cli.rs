@@ -34,8 +34,12 @@ pub enum Command {
         /// Repeated NAME:PATH wordlist mapping.
         #[arg(short = 'w', long = "wordlist")]
         wordlists: Vec<String>,
-        #[arg(short = 'c', long, visible_alias = "workers")]
+        /// Maximum simultaneous requests; independent from worker count.
+        #[arg(short = 'c', long)]
         concurrency: Option<u16>,
+        /// Number of worker state machines.
+        #[arg(long)]
+        workers: Option<u16>,
         /// Repeated stop condition NAME=VALUE.
         #[arg(short = 's', long = "stop")]
         stops: Vec<String>,
