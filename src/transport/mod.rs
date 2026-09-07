@@ -12,6 +12,7 @@ pub struct ClientGeneration(pub u64);
 pub struct SourceBoundClient {
     generation: ClientGeneration,
     local_address: IpAddr,
+    fallback_to_http1: bool,
     client: reqwest::Client,
 }
 
@@ -45,6 +46,7 @@ impl SourceBoundClient {
         Ok(Self {
             generation,
             local_address,
+            fallback_to_http1: config.fallback_to_http1,
             client,
         })
     }
@@ -58,7 +60,8 @@ impl SourceBoundClient {
     }
 
     pub async fn execute(&self, request: PreparedRequest) -> Result<reqwest::Response> {
-        self.client
+        let response = self
+            .client
             .request(request.method, request.url)
             .headers(request.headers)
             .body(request.body)
@@ -69,7 +72,13 @@ impl SourceBoundClient {
                     "HTTP request from {} failed; verify that the source address is configured locally or that net.ipv6.ip_nonlocal_bind is enabled",
                     self.local_address
                 )
-            })
+            })?;
+        if !self.fallback_to_http1 && response.version() == reqwest::Version::HTTP_11 {
+            return Err(anyhow::anyhow!(
+                "server negotiated HTTP/1.1 while HTTP/1.1 fallback is disabled"
+            ));
+        }
+        Ok(response)
     }
 
     pub fn client(&self) -> &reqwest::Client {
