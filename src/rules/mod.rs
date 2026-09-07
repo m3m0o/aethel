@@ -145,7 +145,7 @@ pub fn evaluate(rules: &[Rule], r: &Response<'_>) -> Result<Decision, regex::Err
 }
 pub struct BodyStore {
     temporary: Option<PathBuf>,
-    file: File,
+    file: Option<File>,
     max_bytes: u64,
     written: u64,
 }
@@ -157,18 +157,19 @@ impl BodyStore {
             let id = NEXT_BODY_ID.fetch_add(1, Ordering::Relaxed);
             let path = directory.join(format!(".body-{}-{id}.tmp", std::process::id()));
             match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(f) => break (path, f),
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-                Err(e) => return Err(e),
+                Ok(file) => break (path, file),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
             }
         };
         Ok(Self {
             temporary: Some(temporary),
-            file,
+            file: Some(file),
             max_bytes,
             written: 0,
         })
     }
+
     pub fn write_chunk(&mut self, chunk: &[u8]) -> io::Result<()> {
         let next = self.written.saturating_add(chunk.len() as u64);
         if next > self.max_bytes {
@@ -177,13 +178,20 @@ impl BodyStore {
                 "response body exceeds configured limit",
             ));
         }
-        self.file.write_all(chunk)?;
+        self.file
+            .as_mut()
+            .expect("body store file is present")
+            .write_all(chunk)?;
         self.written = next;
         Ok(())
     }
+
     pub fn finish(mut self, matched: bool) -> io::Result<Option<PathBuf>> {
-        self.file.flush()?;
-        drop(self.file);
+        self.file
+            .as_mut()
+            .expect("body store file is present")
+            .flush()?;
+        self.file.take();
         let temporary = self.temporary.take().expect("body store path is present");
         if !matched {
             fs::remove_file(temporary)?;
