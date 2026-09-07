@@ -1,42 +1,57 @@
 mod cli;
 pub mod config;
+mod error;
+mod logging;
 mod network;
 
+use anyhow::{Context, Result};
 use clap::Parser;
 use cli::{Cli, Command, NetworkCommand};
 use config::{load_network, load_run};
+use error::AppError;
 use network::host_summary;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    logging::init();
+
     match execute(Cli::parse()) {
         Ok(message) => {
             println!("{message}");
             ExitCode::SUCCESS
         }
         Err(error) => {
+            tracing::error!(error = %error, "application failed");
             eprintln!("error: {error}");
-            ExitCode::from(1)
+            ExitCode::from(error.exit_code())
         }
     }
 }
 
-fn execute(cli: Cli) -> Result<String, String> {
+fn execute(cli: Cli) -> Result<String, AppError> {
     match cli.command {
         Command::Run {
             config,
             network,
             workers,
         } => {
-            let mut run = load_run(&config).map_err(|error| error.to_string())?;
-            load_network(&network).map_err(|error| error.to_string())?;
+            let mut run = load_run(&config).with_context(|| {
+                format!("failed to load run configuration: {}", config.display())
+            })?;
+            load_network(&network).with_context(|| {
+                format!(
+                    "failed to load network configuration: {}",
+                    network.display()
+                )
+            })?;
 
             if let Some(workers) = workers {
                 if workers == 0 || workers > 1024 {
-                    return Err(format!(
+                    return Err(anyhow::anyhow!(
                         "{} [--workers]: expected a value from 1 to 1024",
                         config.display()
-                    ));
+                    )
+                    .into());
                 }
                 run.execution.workers = workers;
             }
@@ -48,16 +63,22 @@ fn execute(cli: Cli) -> Result<String, String> {
         }
         Command::Network { command } => match command {
             NetworkCommand::Setup { config } | NetworkCommand::Cleanup { config } => {
-                load_network(&config).map_err(|error| error.to_string())?;
+                load_network(&config).with_context(|| {
+                    format!("failed to load network configuration: {}", config.display())
+                })?;
                 Ok(format!("network configuration valid: {}", config.display()))
             }
             NetworkCommand::Check {
                 config: Some(config),
             } => {
-                load_network(&config).map_err(|error| error.to_string())?;
+                load_network(&config).with_context(|| {
+                    format!("failed to load network configuration: {}", config.display())
+                })?;
                 Ok(format!("network configuration valid: {}", config.display()))
             }
-            NetworkCommand::Check { config: None } => host_summary(),
+            NetworkCommand::Check { config: None } => host_summary()
+                .map_err(anyhow::Error::msg)
+                .map_err(AppError::from),
         },
     }
 }
