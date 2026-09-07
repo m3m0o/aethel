@@ -1,32 +1,63 @@
-use std::env;
+mod cli;
+pub mod config;
+mod network;
+
+use clap::Parser;
+use cli::{Cli, Command, NetworkCommand};
+use config::{load_network, load_run};
+use network::host_summary;
 use std::process::ExitCode;
 
-const USAGE: &str = "Usage: aethel [OPTIONS]
-
-Options:
-    -h, --help       Print help
-    -V, --version    Print version";
-
 fn main() -> ExitCode {
-    let mut arguments = env::args().skip(1);
-    let Some(argument) = arguments.next() else {
-        println!("{USAGE}");
-        return ExitCode::SUCCESS;
-    };
+    match execute(Cli::parse()) {
+        Ok(message) => {
+            println!("{message}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
 
-    match argument.as_str() {
-        "-h" | "--help" if arguments.next().is_none() => {
-            println!("{USAGE}");
-            ExitCode::SUCCESS
+fn execute(cli: Cli) -> Result<String, String> {
+    match cli.command {
+        Command::Run {
+            config,
+            network,
+            workers,
+        } => {
+            let mut run = load_run(&config).map_err(|error| error.to_string())?;
+            load_network(&network).map_err(|error| error.to_string())?;
+
+            if let Some(workers) = workers {
+                if workers == 0 || workers > 1024 {
+                    return Err(format!(
+                        "{} [--workers]: expected a value from 1 to 1024",
+                        config.display()
+                    ));
+                }
+                run.execution.workers = workers;
+            }
+
+            Ok(format!(
+                "run configuration valid: {} worker(s)",
+                run.execution.workers
+            ))
         }
-        "-V" | "--version" if arguments.next().is_none() => {
-            println!("aethel {}", env!("CARGO_PKG_VERSION"));
-            ExitCode::SUCCESS
-        }
-        value => {
-            eprintln!("error: unexpected argument '{value}'");
-            eprintln!("Try 'aethel --help' for usage information.");
-            ExitCode::from(2)
-        }
+        Command::Network { command } => match command {
+            NetworkCommand::Setup { config } | NetworkCommand::Cleanup { config } => {
+                load_network(&config).map_err(|error| error.to_string())?;
+                Ok(format!("network configuration valid: {}", config.display()))
+            }
+            NetworkCommand::Check {
+                config: Some(config),
+            } => {
+                load_network(&config).map_err(|error| error.to_string())?;
+                Ok(format!("network configuration valid: {}", config.display()))
+            }
+            NetworkCommand::Check { config: None } => host_summary(),
+        },
     }
 }
