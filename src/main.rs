@@ -6,10 +6,10 @@ mod network;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use cli::{Cli, Command, NetworkCommand};
-use config::{load_network, load_run};
+use cli::{Cli, Command, NetworkArguments, NetworkCommand};
+use config::{NetworkConfig, load_network, load_run, parse_ndp_backend, validate_network_config};
 use error::AppError;
-use network::{cleanup, configured_summary, host_summary, setup};
+use network::{cleanup, configured_summary, discover, host_summary, setup};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -62,33 +62,60 @@ fn execute(cli: Cli) -> Result<String, AppError> {
             ))
         }
         Command::Network { command } => match command {
-            NetworkCommand::Setup { config } => {
-                let network = load_network(&config).with_context(|| {
-                    format!("failed to load network configuration: {}", config.display())
-                })?;
+            NetworkCommand::Setup(arguments) => {
+                let network = resolve_network(arguments)?;
                 setup(&network)
-                    .with_context(|| format!("failed to set up network: {}", config.display()))
+                    .context("failed to set up network")
                     .map_err(AppError::from)
             }
-            NetworkCommand::Cleanup { config } => {
-                let network = load_network(&config).with_context(|| {
-                    format!("failed to load network configuration: {}", config.display())
-                })?;
+            NetworkCommand::Cleanup(arguments) => {
+                let network = resolve_network(arguments)?;
                 cleanup(&network)
-                    .with_context(|| format!("failed to clean up network: {}", config.display()))
+                    .context("failed to clean up network")
                     .map_err(AppError::from)
             }
-            NetworkCommand::Check {
-                config: Some(config),
-            } => {
-                let network = load_network(&config).with_context(|| {
-                    format!("failed to load network configuration: {}", config.display())
-                })?;
+            NetworkCommand::Check(arguments) => {
+                if arguments.config.is_none()
+                    && arguments.interface.is_none()
+                    && arguments.prefix.is_none()
+                    && arguments.loopback.is_none()
+                    && arguments.backend.is_none()
+                    && arguments.state_root.is_none()
+                {
+                    return host_summary().map_err(AppError::from);
+                }
+                let network = resolve_network(arguments)?;
                 configured_summary(&network)
-                    .with_context(|| format!("failed to inspect network: {}", config.display()))
+                    .context("failed to inspect network")
                     .map_err(AppError::from)
             }
-            NetworkCommand::Check { config: None } => host_summary().map_err(AppError::from),
         },
     }
+}
+
+fn resolve_network(arguments: NetworkArguments) -> Result<NetworkConfig, AppError> {
+    let mut network = match arguments.config {
+        Some(path) => load_network(&path)
+            .with_context(|| format!("failed to load network configuration: {}", path.display()))?,
+        None => discover().context("failed to discover network configuration")?,
+    };
+
+    if let Some(interface) = arguments.interface {
+        network.network.interface = interface;
+    }
+    if let Some(prefix) = arguments.prefix {
+        network.network.prefix = prefix;
+    }
+    if let Some(loopback) = arguments.loopback {
+        network.network.loopback = loopback;
+    }
+    if let Some(backend) = arguments.backend {
+        network.network.backend = parse_ndp_backend(&backend)?;
+    }
+    if let Some(state_root) = arguments.state_root {
+        network.state.root = state_root;
+    }
+
+    validate_network_config(&network)?;
+    Ok(network)
 }
